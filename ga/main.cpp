@@ -12,9 +12,9 @@
 #include <cstdlib>
 
 #define NUMBER_ORGANISMS 200
-#define ALLELES 127
+#define ALLELES 95
+#define ASCII_OFFSET 32
 #define MUTATION_RATE 100
-#define NUM_THREADS 4
 
 
 //typedef struct _thread_data_t {
@@ -117,7 +117,7 @@ void *CreateNewGeneration(void *args) {
                 }
                 
                 if ( rand() % MUTATION_RATE == 0) {
-                     t_inf -> env -> next_gen_organisms[org][gene] = rand() % ALLELES + 1;
+                     t_inf -> env -> next_gen_organisms[org][gene] = rand() % ALLELES + ASCII_OFFSET;
                 }
             }
         }
@@ -208,7 +208,7 @@ void *InitializeOrganisms(void *args) {
         
         //* windows and unix
         for (int j = 0; j < num_genes; j++) {
-            buffer[j] = (rand() % ALLELES) + 1;
+            buffer[j] = (rand() % ALLELES) + ASCII_OFFSET;
         }
         // */
         buffer[num_genes] = 0;
@@ -331,8 +331,9 @@ int main() {
     cout<< "Fittest organism in generation printing frecuency (print every __ generation): \n";
     cin >> print_freq;
     int counter = 0;
-    char bestIndex;
-    
+    if(print_freq != 0){
+        cout<<"Execution time will be recorded, consider that printing to console takes a lot of time for the cpu :) \n";
+    }
     //start first evaluation
    // cout << "1" << endl;
     pthread_barrier_wait(&env.begin_eval);
@@ -341,6 +342,8 @@ int main() {
     target_fitness = env.num_genes;
     int generations = 1;
     
+    clock_t cStart = clock();
+    time_t tStart = time(NULL);
     while (1) {
         // all evaluations should be done
         pthread_barrier_wait(&env.end_eval);
@@ -348,7 +351,7 @@ int main() {
         // get maximum fitness
         max_fitness = thread_args[0].t_max;
         env.total_fitness = 0;
-        for (int i = 1; i < env.num_threads; ++i) {
+        for (int i = 0; i < env.num_threads; ++i) {
             env.total_fitness += thread_args[i].t_total_fit;
             max_fitness = thread_args[i].t_max > max_fitness ? thread_args[i].t_max : max_fitness;
         }
@@ -376,6 +379,11 @@ int main() {
         //start evaluations
         pthread_barrier_wait (&env.begin_eval);
     }
+    clock_t cEnd = clock();
+    time_t tEnd = time(NULL);
+    
+    cout << "Execution cpu time:" << (double)(cEnd - cStart)/CLOCKS_PER_SEC << "\n";
+    cout << "Execution real time:" << (double)(tEnd - tStart) << "\n";
     
     //waiting threads, should quit immedietly
     pthread_barrier_wait (&env.begin_eval);
