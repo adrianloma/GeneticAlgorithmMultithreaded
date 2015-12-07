@@ -25,8 +25,7 @@
  */
 /*
  * Modified by Adrian Lozano
- * Deleted all "restrict" keywords.
- * put everything I needed in header file
+ * Original source can be found at: https://github.com/ademakov/DarwinPthreadBarrier
  */
 
 

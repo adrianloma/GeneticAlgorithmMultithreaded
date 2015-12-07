@@ -3,7 +3,7 @@
  GNU License
  */
 #include <pthread.h>
-//MacOSX doesn't have barriers, this is fixed with the following:
+//MacOSX doesn't have barriers, this is fixed with pthread_barrier.h
 //obtained from https://github.com/ademakov/DarwinPthreadBarrier
 #include "pthread_barrier.h"
 #include <time.h>
@@ -95,14 +95,11 @@ void *CreateNewGeneration(void *args) {
     int start = t_inf -> t_start;
     int end = t_inf -> t_end;
     int num_genes = t_inf -> env -> num_genes;
-    //char **organisms = t_inf -> env -> organisms;
-    //char **next_gen_organisms = t_inf -> env -> next_gen_organisms;
     int parent_one;
     int parent_two;
-    //pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
     
+    pthread_barrier_wait(&t_inf->env->begin_new_gen);
     while ( !(t_inf->env->done) ) {
-        pthread_barrier_wait(&t_inf->env->begin_new_gen);
         for (int org = start; org < end; ++org) {
             // parents might be the same
             parent_one = ChooseOrganism(t_inf -> env);
@@ -110,7 +107,8 @@ void *CreateNewGeneration(void *args) {
 //            int crossoverpoint = rand() % num_genes;
             int crossoverpoint = num_genes/2;
             for (int gene = 0; gene < num_genes; ++gene) {
-                if ( gene < crossoverpoint ) {
+//                if ( gene < crossoverpoint ) {
+                if ( rand() % 2 == 0 ) {
                    // cout << "p1";
                      t_inf -> env -> next_gen_organisms[org][gene] = t_inf -> env -> organisms[parent_one][gene];
                 } else {
@@ -132,6 +130,7 @@ void *CreateNewGeneration(void *args) {
         }
         int delete_this_var = 0;
         pthread_barrier_wait(&t_inf->env->end_new_gen);
+        pthread_barrier_wait(&t_inf->env->begin_new_gen);
     }
     
     pthread_exit(NULL);
@@ -149,10 +148,11 @@ void *EvaluatePopulation(void *args) {
     int t_total_fitness;
     int thread_max;
     
+    pthread_barrier_wait(&t_inf->env->begin_eval);
    // cout<<"before while " << !(t_inf->env->done) << endl;
     while ( !(t_inf->env->done) ) {
         //cout<<"waiting..." << endl;
-        pthread_barrier_wait(&t_inf->env->begin_eval);
+        
         thread_max = 0;
         t_total_fitness = 0;
         org_fitness = 0;
@@ -172,6 +172,7 @@ void *EvaluatePopulation(void *args) {
         t_inf -> t_total_fit = t_total_fitness;
         t_inf -> t_max = thread_max;
         pthread_barrier_wait(&t_inf->env->end_eval);
+        pthread_barrier_wait(&t_inf->env->begin_eval);
     }
     
     
@@ -240,7 +241,7 @@ void InitEnvironment(struct Environment &env){
     
     // UI
     cout<< "Enter target string: \n";
-    cin >> str;
+    getline(cin, str);
     cout<< "Enter number of organisms: \n";
     cin >> num_org;
     cout<< "Number of threads to use: \n";
@@ -287,24 +288,6 @@ void InitEnvironment(struct Environment &env){
 
 
 int main() {
-//    pthread_t *thr = (pthread_t*) malloc(sizeof(pthread_t) * NUM_THREADS);
-//    int i, rc;
-//    /* create a thread_data_t argument array */
-//    thread_data_t thr_data[NUM_THREADS];
-//    
-//    /* create threads */
-//    for (i = 0; i < NUM_THREADS; ++i) {
-//        thr_data[i].tid = i;
-//        if ((rc = pthread_create(&thr[i], NULL, thr_func, &thr_data[i]))) {
-//            fprintf(stderr, "error: pthread_create, rc: %d\n", rc);
-//            return EXIT_FAILURE;
-//        }
-//    }
-//    /* block until all threads complete */
-//    for (i = 0; i < NUM_THREADS; ++i) {
-//        pthread_join(thr[i], NULL);
-//    }
-//    
     
     int target_fitness;
     struct ThreadInfo *thread_args;
@@ -330,7 +313,7 @@ int main() {
         pthread_create(&init_threads[t], NULL, InitializeOrganisms, &thread_args[t]);
     }
     for (int t = 0; t < env.num_threads; t++) {
-        cout <<"finished organism " << t << " \n";
+       // cout <<"finished organism " << t << " \n";
         pthread_join(init_threads[t], NULL);
     }
     
@@ -356,7 +339,7 @@ int main() {
     //cout << "2";
     int max_fitness;
     target_fitness = env.num_genes;
-    int generations = 0;
+    int generations = 1;
     
     while (1) {
         // all evaluations should be done
@@ -394,7 +377,9 @@ int main() {
         pthread_barrier_wait (&env.begin_eval);
     }
     
-    
+    //waiting threads, should quit immedietly
+    pthread_barrier_wait (&env.begin_eval);
+    pthread_barrier_wait(&env.begin_new_gen);
     // join threads
     for (int t = 0; t < env.num_threads; t++) {
         pthread_join(eval_threads[t], NULL);
@@ -405,7 +390,7 @@ int main() {
     
     //report to user
     
-    cout << "Done!\n" << "Found target string \"" << env.target << "\" in " << generations << ".\n";
+    cout << "Done!\n" << "Found target string \"" << env.target << "\" in " << generations << " generations.\n";
     
     
     
